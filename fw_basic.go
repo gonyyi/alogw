@@ -2,17 +2,17 @@ package alogw
 
 import "os"
 
-type fw struct {
+type fwBasic struct {
 	f        *os.File
 	n        int64 // total bytes written
 	filename string
 }
 
-func (w fw) Filename() string {
+func (w fwBasic) Filename() string {
 	return w.filename
 }
 
-func (w *fw) Init(filename string) error {
+func (w *fwBasic) Init(filename string) error {
 	// f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	w.filename = filename
 	f, err := createFile(filename)
@@ -23,16 +23,16 @@ func (w *fw) Init(filename string) error {
 	return nil
 }
 
-func (w *fw) Size() int64 {
+func (w *fwBasic) Size() int64 {
 	return w.n
 }
 
-func (w *fw) Write(p []byte) (int, error) {
+func (w *fwBasic) Write(p []byte) (int, error) {
 	w.n += int64(len(p))
 	return w.f.Write(p)
 }
 
-func (w *fw) Close() error {
+func (w *fwBasic) Close() error {
 	w.n = 0
 	return w.f.Close()
 }
