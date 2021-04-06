@@ -39,6 +39,8 @@ func (w *Writer) Close() error {
 		return err
 	}
 
+	removeSymlink(w.conf.symlink())
+
 	if err := gzipFile(w.fw.Filename()); err != nil {
 		return err
 	}
@@ -54,11 +56,13 @@ func (w *Writer) checkRotate(p int64) error {
 	defer w.mu.Unlock()
 
 	// If size became larger but not meant to write to same file
-	if (w.fw.Size() + p) > w.conf.MaxSize && w.fw.Filename() != w.conf.newFilename() {
+	if (w.fw.Size()+p) > w.conf.MaxSize && w.fw.Filename() != w.conf.newFilename() {
 		err := w.fw.Close()
 		if err != nil {
 			return err
 		}
+
+		removeSymlink(w.conf.symlink())
 
 		if w.conf.EnableGzip {
 			filename := w.fw.Filename()
@@ -77,7 +81,10 @@ func (w *Writer) checkRotate(p int64) error {
 			}(filename)
 		}
 
-		err = w.fw.Init(w.conf.newFilename())
+		newFilename := w.conf.newFilename()
+		setSymlink(newFilename, w.conf.symlink())
+
+		err = w.fw.Init(newFilename)
 		if err != nil {
 			return err
 		}
