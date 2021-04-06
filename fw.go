@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-type writer interface {
+type fw interface {
 	Filename() string
 	Init(filename string) error
 	Write(p []byte) (int, error)
