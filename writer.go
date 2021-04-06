@@ -1,38 +1,28 @@
 package alogw
 
 import (
+	"os"
 	"sync"
 )
 
-// CONST: bufwriter size
-const (
-	_ = 1 << (10 * iota)
-	KB
-	MB
-	GB
-	TB
-	PB
-	EB
-)
-
-// Writer is a rotate bfw
+// Writer is a rotate fwBuffered
 type Writer struct {
-	conf Conf
-	mu   sync.Mutex
-	fw   fileWriter
+	conf *Conf
+	mu   sync.RWMutex // use 'em when rotating file
+	fw   fw
 }
 
-func NewWriter(conf Conf) (*Writer, error) {
+func NewWriter(conf *Conf) (*Writer, error) {
+	if conf == nil {
+		conf = NewConf()
+	}
 	w := Writer{conf: conf}
 
-	if conf.UseGzip == true {
-		w.fw = &gzfw{bufsize: conf.BufferSize}
-		conf.Suffix = conf.Suffix + ".gz"
-		w.conf = conf
-	} else if conf.BufferSize > 0 {
-		w.fw = &bfw{bufsize: conf.BufferSize}
+	// If buffer is set, use buffered fw (fwBuffered), otherwise use basic fw (fwBasic)
+	if conf.BufSize > 0 {
+		w.fw = &fwBuffered{bufsize: conf.BufSize}
 	} else {
-		w.fw = &fw{}
+		w.fw = &fwBasic{}
 	}
 
 	if err := w.fw.Init(w.conf.newFilename()); err != nil {
@@ -48,27 +38,55 @@ func (w *Writer) Close() error {
 	if err := w.fw.Close(); err != nil {
 		return err
 	}
+
+	if err := gzipFile(w.fw.Filename()); err != nil {
+		return err
+	}
+	if err := os.Remove(w.fw.Filename()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (w *Writer) checkRotate(p int) error {
-	if w.fw.Size()+p > w.conf.MaxFilesize {
+func (w *Writer) checkRotate(p int64) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// If size became larger but not meant to write to same file
+	if (w.fw.Size() + p) > w.conf.MaxSize && w.fw.Filename() != w.conf.newFilename() {
 		err := w.fw.Close()
 		if err != nil {
-			println(1, err.Error())
+			return err
+		}
+
+		if w.conf.EnableGzip {
+			filename := w.fw.Filename()
+			// Running as a goroutine
+			go func(f string) {
+				err := gzipFile(f)
+				if err != nil {
+					println(err.Error())
+					return
+				}
+				// if no error, that means file has been gzip'd well.
+				// therefore, delete the old file.
+				if err := os.Remove(f); err != nil {
+					println(err.Error())
+				}
+			}(filename)
 		}
 
 		err = w.fw.Init(w.conf.newFilename())
 		if err != nil {
-			println(2, err.Error())
+			return err
 		}
 	}
+
 	return nil
 }
 
 func (w *Writer) Write(p []byte) (int, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.checkRotate(len(p))
+	w.checkRotate(int64(len(p)))
 	return w.fw.Write(p)
 }
