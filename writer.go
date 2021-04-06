@@ -2,6 +2,7 @@ package alogw
 
 import (
 	"os"
+	"path"
 	"sync"
 )
 
@@ -25,9 +26,11 @@ func NewWriter(conf *Conf) (*Writer, error) {
 		w.fw = &fwBasic{}
 	}
 
-	if err := w.fw.Init(w.conf.newFilename()); err != nil {
+	newFilename := w.conf.newFilename()
+	if err := w.fw.Init(newFilename); err != nil {
 		return nil, err
 	}
+	setSymlink(path.Base(newFilename), w.conf.symlink())
 
 	return &w, nil
 }
@@ -82,7 +85,7 @@ func (w *Writer) checkRotate(p int64) error {
 		}
 
 		newFilename := w.conf.newFilename()
-		setSymlink(newFilename, w.conf.symlink())
+		setSymlink(path.Base(newFilename), w.conf.symlink())
 
 		err = w.fw.Init(newFilename)
 		if err != nil {
