@@ -11,7 +11,7 @@ func main() {
 	c.EnableGzip = true
 	c.FileAggrLevel = alogw.BySecond
 	c.MaxSize = alogw.KB * 1
-	c.Prefix = "./data/test-"
+	c.Prefix = "./data/test"
 	c.Suffix = ".log"
 	w, err := alogw.NewWriter(c)
 	if err != nil {
