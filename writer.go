@@ -44,13 +44,15 @@ func (w *Writer) Close() error {
 
 	removeSymlink(w.conf.symlink())
 
-	if err := gzipFile(w.fw.Filename()); err != nil {
-		return err
+	if w.conf.EnableGzip {
+		if err := gzipFile(w.fw.Filename()); err != nil {
+			return err
+		}
+		if err := os.Remove(w.fw.Filename()); err != nil {
+			return err
+		}
 	}
-	if err := os.Remove(w.fw.Filename()); err != nil {
-		return err
-	}
-
+	
 	return nil
 }
 
